@@ -1260,9 +1260,43 @@ function deletePartido(spreadsheet, e) {
                             <button onclick="generarJornadas()" class="btn-success">
                                 🎲 Generar Jornadas Automáticamente
                             </button>
-                            <button onclick="agregarJornada()" class="btn-secondary">
+                            <button onclick="mostrarFormularioJornada()" class="btn-secondary">
                                 ➕ Agregar Jornada Manual
                             </button>
+                        </div>
+
+                        <!-- Formulario para agregar/editar jornada (oculto por defecto) -->
+                        <div id="formularioJornada" style="display: none; margin-top: 20px; padding: 20px; background: #f0f8ff; border-radius: 8px;">
+                            <h3 id="tituloFormularioJornada">Nueva Jornada</h3>
+                            <input type="hidden" id="jornadaEditId">
+                            
+                            <div class="form-group">
+                                <label for="nombreJornada">Nombre de la jornada:</label>
+                                <input type="text" id="nombreJornada" placeholder="Ej: Jornada 1">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fechaJornada">Fecha (opcional):</label>
+                                <input type="date" id="fechaJornada">
+                            </div>
+                            
+                            <h4>Partidos de la jornada:</h4>
+                            <div id="partidosJornada">
+                                <!-- Aquí se agregarán dinámicamente los partidos -->
+                            </div>
+                            
+                            <button onclick="agregarPartidoJornada()" class="btn-secondary">
+                                ➕ Agregar Partido
+                            </button>
+                            
+                            <div style="margin-top: 20px;">
+                                <button onclick="guardarJornada()" class="btn-success">
+                                    💾 Guardar Jornada
+                                </button>
+                                <button onclick="cancelarFormularioJornada()" class="btn-secondary">
+                                    ❌ Cancelar
+                                </button>
+                            </div>
                         </div>
 
                         <div id="listaJornadas" class="loading">Cargando jornadas...</div>
@@ -1372,13 +1406,22 @@ function deletePartido(spreadsheet, e) {
             await cargarTodosLosDatos();
         }
 
+        // URL HARDCODEADA - Cambia esta línea con tu URL real de Google Apps Script
+        const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/TU_URL_AQUI/exec';
+        
         // Inicializar al cargar
         window.onload = function() {
-            // Intentar cargar URL guardada
+            // Primero intenta cargar URL guardada, si no existe usa la hardcodeada
             const savedUrl = localStorage.getItem('padelcup2_scriptUrl');
-            if (savedUrl) {
-                document.getElementById('scriptUrl').value = savedUrl;
-            }
+            const urlToUse = savedUrl || DEFAULT_SCRIPT_URL;
+            
+            document.getElementById('scriptUrl').value = urlToUse;
+            
+            // AUTOCONEXIÓN: Si quieres que se conecte automáticamente al cargar
+            // descomenta la siguiente línea después de poner tu URL real:
+            // if (urlToUse !== 'https://script.google.com/macros/s/TU_URL_AQUI/exec') { 
+            //     conectarGoogleSheets(); 
+            // }
         };
 
         // === FUNCIONES DE LA APLICACIÓN ===
@@ -1622,6 +1665,176 @@ function deletePartido(spreadsheet, e) {
             }
         }
 
+        // Mostrar formulario de jornada
+        function mostrarFormularioJornada() {
+            document.getElementById('formularioJornada').style.display = 'block';
+            document.getElementById('tituloFormularioJornada').textContent = 'Nueva Jornada';
+            document.getElementById('jornadaEditId').value = '';
+            document.getElementById('nombreJornada').value = '';
+            document.getElementById('fechaJornada').value = '';
+            document.getElementById('partidosJornada').innerHTML = '';
+            
+            // Agregar primer partido por defecto
+            agregarPartidoJornada();
+        }
+
+        // Cancelar formulario de jornada
+        function cancelarFormularioJornada() {
+            document.getElementById('formularioJornada').style.display = 'none';
+        }
+
+        // Contador para partidos temporales
+        let contadorPartidosTemp = 0;
+
+        // Agregar partido a la jornada
+        function agregarPartidoJornada() {
+            const contenedor = document.getElementById('partidosJornada');
+            const idTemp = 'partido_' + (contadorPartidosTemp++);
+            
+            const partidoDiv = document.createElement('div');
+            partidoDiv.id = idTemp;
+            partidoDiv.style.cssText = 'margin: 10px 0; padding: 10px; background: white; border-radius: 5px;';
+            
+            let opcionesParejas = '<option value="">Selecciona pareja</option>';
+            parejas.forEach(pareja => {
+                opcionesParejas += `<option value="${pareja.id}">${pareja.nombre}</option>`;
+            });
+            
+            partidoDiv.innerHTML = `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pareja 1:</label>
+                        <select class="pareja1-jornada">
+                            ${opcionesParejas}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pareja 2:</label>
+                        <select class="pareja2-jornada">
+                            ${opcionesParejas}
+                        </select>
+                    </div>
+                    <button onclick="quitarPartidoJornada('${idTemp}')" class="btn-danger" style="margin-top: 25px;">
+                        ❌ Quitar
+                    </button>
+                </div>
+            `;
+            
+            contenedor.appendChild(partidoDiv);
+        }
+
+        // Quitar partido de la jornada
+        function quitarPartidoJornada(idTemp) {
+            const elemento = document.getElementById(idTemp);
+            if (elemento) {
+                elemento.remove();
+            }
+        }
+
+        // Guardar jornada
+        async function guardarJornada() {
+            const jornadaEditId = document.getElementById('jornadaEditId').value;
+            const nombre = document.getElementById('nombreJornada').value.trim();
+            const fecha = document.getElementById('fechaJornada').value;
+            
+            if (!nombre) {
+                alert('Por favor, ingresa el nombre de la jornada');
+                return;
+            }
+            
+            // Recopilar partidos
+            const partidosElements = document.querySelectorAll('#partidosJornada > div');
+            const partidosJornada = [];
+            
+            for (let elemento of partidosElements) {
+                const pareja1Id = elemento.querySelector('.pareja1-jornada').value;
+                const pareja2Id = elemento.querySelector('.pareja2-jornada').value;
+                
+                if (pareja1Id && pareja2Id) {
+                    if (pareja1Id === pareja2Id) {
+                        alert('Una pareja no puede jugar contra sí misma');
+                        return;
+                    }
+                    
+                    const pareja1 = parejas.find(p => p.id === pareja1Id);
+                    const pareja2 = parejas.find(p => p.id === pareja2Id);
+                    
+                    partidosJornada.push({
+                        pareja1: pareja1,
+                        pareja2: pareja2
+                    });
+                }
+            }
+            
+            try {
+                if (jornadaEditId) {
+                    // Actualizar jornada existente
+                    const result = await jsonpRequest(scriptUrl, {
+                        action: 'updateJornada',
+                        id: jornadaEditId,
+                        nombre: nombre,
+                        fecha: fecha,
+                        partidos: JSON.stringify(partidosJornada)
+                    });
+                    
+                    if (result.success) {
+                        mostrarMensaje('✅ Jornada actualizada correctamente', 'success');
+                    }
+                } else {
+                    // Crear nueva jornada
+                    const result = await jsonpRequest(scriptUrl, {
+                        action: 'addJornada',
+                        nombre: nombre,
+                        fecha: fecha,
+                        partidos: JSON.stringify(partidosJornada)
+                    });
+                    
+                    if (result.success) {
+                        mostrarMensaje('✅ Jornada creada correctamente', 'success');
+                    }
+                }
+                
+                cancelarFormularioJornada();
+                await cargarTodosLosDatos();
+                
+            } catch (error) {
+                mostrarMensaje('Error al guardar jornada: ' + error.message, 'error');
+            }
+        }
+
+        // Editar jornada
+        async function editarJornada(id) {
+            const jornada = jornadas.find(j => j.id === id);
+            if (!jornada) return;
+            
+            // Mostrar formulario
+            document.getElementById('formularioJornada').style.display = 'block';
+            document.getElementById('tituloFormularioJornada').textContent = 'Editar Jornada';
+            document.getElementById('jornadaEditId').value = jornada.id;
+            document.getElementById('nombreJornada').value = jornada.nombre;
+            document.getElementById('fechaJornada').value = jornada.fecha || '';
+            
+            // Limpiar partidos actuales
+            document.getElementById('partidosJornada').innerHTML = '';
+            contadorPartidosTemp = 0;
+            
+            // Cargar partidos existentes
+            if (jornada.partidos && jornada.partidos.length > 0) {
+                jornada.partidos.forEach(partido => {
+                    agregarPartidoJornada();
+                    const ultimoPartido = document.querySelector('#partidosJornada > div:last-child');
+                    ultimoPartido.querySelector('.pareja1-jornada').value = partido.pareja1.id;
+                    ultimoPartido.querySelector('.pareja2-jornada').value = partido.pareja2.id;
+                });
+            } else {
+                // Si no hay partidos, agregar uno vacío
+                agregarPartidoJornada();
+            }
+            
+            // Hacer scroll al formulario
+            document.getElementById('formularioJornada').scrollIntoView({ behavior: 'smooth' });
+        }
+
         // Actualizar lista de jornadas
         function actualizarListaJornadas() {
             const lista = document.getElementById('listaJornadas');
@@ -1631,14 +1844,18 @@ function deletePartido(spreadsheet, e) {
                 return;
             }
 
-            let html = '<table><thead><tr><th>Jornada</th><th>Partidos</th><th>Acciones</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>Jornada</th><th>Fecha</th><th>Partidos</th><th>Acciones</th></tr></thead><tbody>';
             
             jornadas.forEach(jornada => {
                 const numPartidos = jornada.partidos ? jornada.partidos.length : 0;
+                const fecha = jornada.fecha ? new Date(jornada.fecha).toLocaleDateString('es-ES') : '-';
+                
                 html += `<tr>
                     <td><strong>${jornada.nombre}</strong></td>
+                    <td>${fecha}</td>
                     <td>${numPartidos} partidos</td>
                     <td>
+                        <button onclick="editarJornada('${jornada.id}')" class="btn-warning">✏️ Editar</button>
                         <button onclick="eliminarJornada('${jornada.id}')" class="btn-danger">🗑️ Eliminar</button>
                     </td>
                 </tr>`;
@@ -1647,7 +1864,7 @@ function deletePartido(spreadsheet, e) {
                 if (jornada.partidos && jornada.partidos.length > 0) {
                     jornada.partidos.forEach(partido => {
                         html += `<tr style="background-color: #f9f9f9;">
-                            <td colspan="3" style="padding-left: 30px;">
+                            <td colspan="4" style="padding-left: 30px;">
                                 ${partido.pareja1.nombre} vs ${partido.pareja2.nombre}
                             </td>
                         </tr>`;
