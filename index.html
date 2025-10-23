@@ -404,6 +404,27 @@
             text-shadow: 0 0 10px rgba(205, 127, 50, 0.5);
         }
 
+        .partido-card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .partido-info {
+            flex-grow: 1;
+        }
+
+        .partido-resultado {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
         .footer {
             text-align: center;
             padding: 20px;
@@ -448,20 +469,24 @@
         <div id="connectionStatus" class="connection-status disconnected">Desconectado</div>
         
         <div class="header">
-            <div class="sponsor-container">
-                <img src="./images/ecav.jpeg"
-                    alt="ECAV Logo" 
-                    class="sponsor-logo">
-                <p class="sponsor-text">
-                    Desarrollado por<br>
-                    <a href="https://ecav.com.py" target="_blank" class="sponsor-link">ECAV.com.py</a>
-                </p>
-            </div>
+
             
             <h1>
-                <span class="trophy-icon">🏆</span>
-                Premium PadelCup 2.0
-                <span class="trophy-icon">🏆</span>
+                <div class="sponsor-container">
+                    <img src="./images/padelcup.jpeg" 
+                        alt="Cup Logo" 
+                        class="sponsor-logo">
+                </div>
+                    Premium PadelCup 2.0
+                <div class="sponsor-container">
+                    <img src="./images/ecav.jpeg" 
+                        alt="ECAV Logo" 
+                        class="sponsor-logo">
+                    <p class="sponsor-text">
+                        Desarrollado por<br>
+                        <a href="https://ecav.com.py" target="_blank" class="sponsor-link">ECAV.com.py</a>
+                    </p>
+                </div> 
             </h1>
             <p class="subtitle">Sistema de Gestión de Torneo - Edición Google Sheets</p>
         </div>
@@ -474,537 +499,9 @@
             <ol>
                 <li>Crea una nueva hoja de cálculo en Google Sheets</li>
                 <li>En el menú, ve a <strong>Extensiones → Apps Script</strong></li>
-                <li>Borra todo el código y pega el siguiente:</li>
-            </ol>
-            
-            <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 15px 0;">
-<code>// ===== CÓDIGO APPS SCRIPT PARA PREMIUM PADELCUP 2.0 =====
-
-function doGet(e) {
-  return handleRequest(e);
-}
-
-function doPost(e) {
-  return handleRequest(e);
-}
-
-function handleRequest(e) {
-  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  var action = e.parameter.action;
-  var callback = e.parameter.callback;
-  
-  try {
-    initializeSheets(spreadsheet);
-    var result = {};
-    
-    switch(action) {
-      // === CONFIGURACIÓN ===
-      case 'getConfig':
-        result = getConfig(spreadsheet);
-        break;
-      case 'saveConfig':
-        result = saveConfig(spreadsheet, e);
-        break;
-        
-      // === PAREJAS ===
-      case 'getParejas':
-        result = getParejas(spreadsheet);
-        break;
-      case 'addPareja':
-        result = addPareja(spreadsheet, e);
-        break;
-      case 'deletePareja':
-        result = deletePareja(spreadsheet, e);
-        break;
-        
-      // === JORNADAS ===
-      case 'getJornadas':
-        result = getJornadas(spreadsheet);
-        break;
-      case 'addJornada':
-        result = addJornada(spreadsheet, e);
-        break;
-      case 'deleteJornada':
-        result = deleteJornada(spreadsheet, e);
-        break;
-      case 'generarJornadas':
-        result = generarJornadas(spreadsheet, e);
-        break;
-        
-      // === PARTIDOS ===
-      case 'getPartidos':
-        result = getPartidos(spreadsheet);
-        break;
-      case 'addPartido':
-        result = addPartido(spreadsheet, e);
-        break;
-      case 'updatePartido':
-        result = updatePartido(spreadsheet, e);
-        break;
-      case 'deletePartido':
-        result = deletePartido(spreadsheet, e);
-        break;
-        
-      case 'test':
-        result = {success: true, message: 'Conexión exitosa con Premium PadelCup 2.0'};
-        break;
-        
-      default:
-        result = {success: false, error: 'Acción no válida: ' + action};
-    }
-    
-    // Devolver JSONP si hay callback
-    if (callback) {
-      return ContentService
-        .createTextOutput(callback + '(' + JSON.stringify(result) + ')')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
-    } else {
-      return ContentService
-        .createTextOutput(JSON.stringify(result))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    
-  } catch(error) {
-    var errorResult = {success: false, error: error.toString(), stack: error.stack};
-    if (callback) {
-      return ContentService
-        .createTextOutput(callback + '(' + JSON.stringify(errorResult) + ')')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
-    } else {
-      return ContentService
-        .createTextOutput(JSON.stringify(errorResult))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-}
-
-function initializeSheets(spreadsheet) {
-  // Crear hoja de Configuración
-  var configSheet = spreadsheet.getSheetByName('Configuración');
-  if (!configSheet) {
-    configSheet = spreadsheet.insertSheet('Configuración');
-    configSheet.getRange('A1:B1').setValues([['Parámetro', 'Valor']]);
-    configSheet.getRange('A2:B8').setValues([
-      ['formato', 'todos'],
-      ['puntosPorVictoria', '3'],
-      ['puntosPorEmpate', '1'],
-      ['numeroGrupos', '2'],
-      ['clasificanPorGrupo', '2'],
-      ['faseInicial', 'cuartos'],
-      ['tercerPuesto', 'true']
-    ]);
-    configSheet.getRange('A1:B1').setFontWeight('bold');
-  }
-  
-  // Crear hoja de Parejas
-  var parejasSheet = spreadsheet.getSheetByName('Parejas');
-  if (!parejasSheet) {
-    parejasSheet = spreadsheet.insertSheet('Parejas');
-    parejasSheet.getRange('A1:E1').setValues([['ID', 'Jugador1', 'Jugador2', 'Nombre', 'Grupo']]);
-    parejasSheet.getRange('A1:E1').setFontWeight('bold');
-    parejasSheet.setFrozenRows(1);
-  }
-  
-  // Crear hoja de Jornadas
-  var jornadasSheet = spreadsheet.getSheetByName('Jornadas');
-  if (!jornadasSheet) {
-    jornadasSheet = spreadsheet.insertSheet('Jornadas');
-    jornadasSheet.getRange('A1:F1').setValues([['ID', 'Numero', 'Nombre', 'Fecha', 'Grupo', 'Partidos']]);
-    jornadasSheet.getRange('A1:F1').setFontWeight('bold');
-    jornadasSheet.setFrozenRows(1);
-  }
-  
-  // Crear hoja de Partidos
-  var partidosSheet = spreadsheet.getSheetByName('Partidos');
-  if (!partidosSheet) {
-    partidosSheet = spreadsheet.insertSheet('Partidos');
-    partidosSheet.getRange('A1:J1').setValues([
-      ['ID', 'JornadaID', 'Fase', 'Fecha', 'Pista', 'Pareja1ID', 'Pareja2ID', 'Resultado1', 'Resultado2', 'GanadorID']
-    ]);
-    partidosSheet.getRange('A1:J1').setFontWeight('bold');
-    partidosSheet.setFrozenRows(1);
-  }
-}
-
-// === FUNCIONES DE CONFIGURACIÓN ===
-function getConfig(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName('Configuración');
-  var data = sheet.getRange('A2:B8').getValues();
-  var config = {};
-  
-  data.forEach(function(row) {
-    var key = row[0];
-    var value = row[1];
-    
-    if (key === 'puntosPorVictoria' || key === 'puntosPorEmpate' || 
-        key === 'numeroGrupos' || key === 'clasificanPorGrupo') {
-      config[key] = parseInt(value);
-    } else if (key === 'tercerPuesto') {
-      config[key] = value === 'true';
-    } else {
-      config[key] = value;
-    }
-  });
-  
-  return {success: true, data: config};
-}
-
-function saveConfig(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Configuración');
-  
-  var configData = [
-    ['formato', e.parameter.formato],
-    ['puntosPorVictoria', e.parameter.puntosPorVictoria],
-    ['puntosPorEmpate', e.parameter.puntosPorEmpate],
-    ['numeroGrupos', e.parameter.numeroGrupos],
-    ['clasificanPorGrupo', e.parameter.clasificanPorGrupo],
-    ['faseInicial', e.parameter.faseInicial],
-    ['tercerPuesto', e.parameter.tercerPuesto]
-  ];
-  
-  sheet.getRange('A2:B8').setValues(configData);
-  return {success: true};
-}
-
-// === FUNCIONES DE PAREJAS ===
-function getParejas(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName('Parejas');
-  var data = sheet.getDataRange().getValues();
-  var parejas = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0]) {
-      parejas.push({
-        id: data[i][0].toString(),
-        jugador1: data[i][1],
-        jugador2: data[i][2],
-        nombre: data[i][3],
-        grupo: data[i][4]
-      });
-    }
-  }
-  
-  return {success: true, data: parejas};
-}
-
-function addPareja(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Parejas');
-  var id = new Date().getTime().toString();
-  var jugador1 = e.parameter.jugador1;
-  var jugador2 = e.parameter.jugador2;
-  var nombre = e.parameter.nombre || (jugador1 + ' / ' + jugador2);
-  
-  sheet.appendRow([id, jugador1, jugador2, nombre, '']);
-  
-  return {success: true, id: id};
-}
-
-function deletePareja(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Parejas');
-  var id = e.parameter.id;
-  var data = sheet.getDataRange().getValues();
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0].toString() === id) {
-      sheet.deleteRow(i + 1);
-      break;
-    }
-  }
-  
-  // También eliminar partidos de esta pareja
-  var partidosSheet = spreadsheet.getSheetByName('Partidos');
-  var partidosData = partidosSheet.getDataRange().getValues();
-  
-  for (var i = partidosData.length - 1; i >= 1; i--) {
-    if (partidosData[i][5] === id || partidosData[i][6] === id) {
-      partidosSheet.deleteRow(i + 1);
-    }
-  }
-  
-  return {success: true};
-}
-
-// === FUNCIONES DE JORNADAS ===
-function getJornadas(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName('Jornadas');
-  var data = sheet.getDataRange().getValues();
-  var jornadas = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0]) {
-      var partidos = [];
-      try {
-        if (data[i][5]) {
-          partidos = JSON.parse(data[i][5]);
-        }
-      } catch(e) {}
-      
-      jornadas.push({
-        id: data[i][0].toString(),
-        numero: data[i][1],
-        nombre: data[i][2],
-        fecha: data[i][3],
-        grupo: data[i][4],
-        partidos: partidos
-      });
-    }
-  }
-  
-  return {success: true, data: jornadas};
-}
-
-function addJornada(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Jornadas');
-  var id = new Date().getTime().toString();
-  var numero = sheet.getLastRow();
-  var nombre = e.parameter.nombre;
-  
-  sheet.appendRow([id, numero, nombre, '', '', '[]']);
-  
-  return {success: true, id: id};
-}
-
-function deleteJornada(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Jornadas');
-  var id = e.parameter.id;
-  var data = sheet.getDataRange().getValues();
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0].toString() === id) {
-      sheet.deleteRow(i + 1);
-      break;
-    }
-  }
-  
-  return {success: true};
-}
-
-function generarJornadas(spreadsheet, e) {
-  var configResult = getConfig(spreadsheet);
-  var config = configResult.data;
-  var parejasResult = getParejas(spreadsheet);
-  var parejas = parejasResult.data;
-  
-  var jornadasSheet = spreadsheet.getSheetByName('Jornadas');
-  
-  // Limpiar jornadas existentes
-  if (jornadasSheet.getLastRow() > 1) {
-    jornadasSheet.deleteRows(2, jornadasSheet.getLastRow() - 1);
-  }
-  
-  if (config.formato === 'todos') {
-    // Round-robin para todos contra todos
-    var n = parejas.length;
-    var rounds = n % 2 === 0 ? n - 1 : n;
-    
-    for (var round = 0; round < rounds; round++) {
-      var jornadaPartidos = [];
-      
-      for (var i = 0; i < n / 2; i++) {
-        var home = (round + i) % (n - 1);
-        var away = (n - 1 - i + round) % (n - 1);
-        
-        if (i === 0 && n % 2 === 0) {
-          away = n - 1;
-        }
-        
-        if (home !== away && home < parejas.length && away < parejas.length) {
-          jornadaPartidos.push({
-            pareja1: parejas[home],
-            pareja2: parejas[away]
-          });
-        }
-      }
-      
-      var jornadaId = new Date().getTime() + round;
-      jornadasSheet.appendRow([
-        jornadaId,
-        round + 1,
-        'Jornada ' + (round + 1),
-        '',
-        '',
-        JSON.stringify(jornadaPartidos)
-      ]);
-    }
-  } else if (config.formato === 'grupos') {
-    // Asignar grupos
-    var parejasSheet = spreadsheet.getSheetByName('Parejas');
-    var parejasPorGrupo = Math.ceil(parejas.length / config.numeroGrupos);
-    
-    // Mezclar parejas aleatoriamente
-    var parejasAleatorias = parejas.slice();
-    for (var i = parejasAleatorias.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var temp = parejasAleatorias[i];
-      parejasAleatorias[i] = parejasAleatorias[j];
-      parejasAleatorias[j] = temp;
-    }
-    
-    // Asignar grupos y actualizar
-    for (var i = 0; i < parejasAleatorias.length; i++) {
-      var grupoIndex = Math.floor(i / parejasPorGrupo);
-      var grupo = String.fromCharCode(65 + grupoIndex);
-      parejasAleatorias[i].grupo = grupo;
-      
-      // Actualizar en la hoja
-      var data = parejasSheet.getDataRange().getValues();
-      for (var j = 1; j < data.length; j++) {
-        if (data[j][0].toString() === parejasAleatorias[i].id) {
-          parejasSheet.getRange(j + 1, 5).setValue(grupo);
-          break;
-        }
-      }
-    }
-    
-    // Generar jornadas por grupo
-    var jornadaCount = 0;
-    for (var g = 0; g < config.numeroGrupos; g++) {
-      var grupoLetra = String.fromCharCode(65 + g);
-      var parejasGrupo = parejasAleatorias.filter(function(p) { return p.grupo === grupoLetra; });
-      
-      if (parejasGrupo.length > 1) {
-        var n = parejasGrupo.length;
-        var rounds = n % 2 === 0 ? n - 1 : n;
-        
-        for (var round = 0; round < rounds; round++) {
-          var jornadaPartidos = [];
-          
-          for (var i = 0; i < n / 2; i++) {
-            var home = (round + i) % (n - 1);
-            var away = (n - 1 - i + round) % (n - 1);
-            
-            if (i === 0 && n % 2 === 0) {
-              away = n - 1;
-            }
-            
-            if (home !== away && home < parejasGrupo.length && away < parejasGrupo.length) {
-              jornadaPartidos.push({
-                pareja1: parejasGrupo[home],
-                pareja2: parejasGrupo[away],
-                grupo: grupoLetra
-              });
-            }
-          }
-          
-          if (jornadaPartidos.length > 0) {
-            jornadaCount++;
-            var jornadaId = new Date().getTime() + jornadaCount;
-            jornadasSheet.appendRow([
-              jornadaId,
-              jornadaCount,
-              'Grupo ' + grupoLetra + ' - Jornada ' + (round + 1),
-              '',
-              grupoLetra,
-              JSON.stringify(jornadaPartidos)
-            ]);
-          }
-        }
-      }
-    }
-  }
-  
-  return {success: true, message: 'Jornadas generadas correctamente'};
-}
-
-// === FUNCIONES DE PARTIDOS ===
-function getPartidos(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName('Partidos');
-  var data = sheet.getDataRange().getValues();
-  var partidos = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0]) {
-      partidos.push({
-        id: data[i][0].toString(),
-        jornadaId: data[i][1] ? data[i][1].toString() : null,
-        fase: data[i][2],
-        fecha: data[i][3],
-        pista: data[i][4],
-        pareja1Id: data[i][5],
-        pareja2Id: data[i][6],
-        resultado1: data[i][7],
-        resultado2: data[i][8],
-        ganadorId: data[i][9] ? data[i][9].toString() : null
-      });
-    }
-  }
-  
-  return {success: true, data: partidos};
-}
-
-function addPartido(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Partidos');
-  var id = new Date().getTime().toString();
-  
-  sheet.appendRow([
-    id,
-    e.parameter.jornadaId || '',
-    e.parameter.fase,
-    e.parameter.fecha || '',
-    e.parameter.pista || '',
-    e.parameter.pareja1Id,
-    e.parameter.pareja2Id,
-    e.parameter.resultado1 || '',
-    e.parameter.resultado2 || '',
-    e.parameter.ganadorId || ''
-  ]);
-  
-  return {success: true, id: id};
-}
-
-function updatePartido(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Partidos');
-  var id = e.parameter.id;
-  var data = sheet.getDataRange().getValues();
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0].toString() === id) {
-      sheet.getRange(i + 1, 2, 1, 9).setValues([[
-        e.parameter.jornadaId || '',
-        e.parameter.fase,
-        e.parameter.fecha || '',
-        e.parameter.pista || '',
-        e.parameter.pareja1Id,
-        e.parameter.pareja2Id,
-        e.parameter.resultado1 || '',
-        e.parameter.resultado2 || '',
-        e.parameter.ganadorId || ''
-      ]]);
-      break;
-    }
-  }
-  
-  return {success: true};
-}
-
-function deletePartido(spreadsheet, e) {
-  var sheet = spreadsheet.getSheetByName('Partidos');
-  var id = e.parameter.id;
-  var data = sheet.getDataRange().getValues();
-  
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0].toString() === id) {
-      sheet.deleteRow(i + 1);
-      break;
-    }
-  }
-  
-  return {success: true};
-}</code></pre>
-
-            <ol start="4">
-                <li>Guarda el proyecto con un nombre (ej: "PadelCup2-GestionTorneo")</li>
-                <li>Haz clic en <strong>Implementar → Nueva implementación</strong></li>
-                <li>Configuración:
-                    <ul>
-                        <li>Tipo: <strong>Aplicación web</strong></li>
-                        <li>Ejecutar como: <strong>Yo</strong></li>
-                        <li>Acceso: <strong>Cualquier persona</strong></li>
-                    </ul>
-                </li>
-                <li>Haz clic en <strong>Implementar</strong></li>
-                <li><strong>IMPORTANTE:</strong> Autoriza todos los permisos cuando te lo solicite</li>
-                <li>Copia la URL de la aplicación web que te proporciona</li>
+                <li>Borra todo el código y pega el código del archivo adjunto</li>
+                <li>Guarda e implementa como aplicación web</li>
+                <li>Copia la URL de la aplicación web</li>
             </ol>
             
             <div class="form-group">
@@ -1018,12 +515,226 @@ function deletePartido(spreadsheet, e) {
 
         <!-- Contenido principal (oculto hasta conectar) -->
         <div id="mainContent" style="display: none;">
-            <!-- Los tabs y contenido irán aquí, simplificado por espacio -->
-            <p class="loading">Conectando con Google Sheets...</p>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('configuracion')">⚙️ Configuración</div>
+                <div class="tab" onclick="showTab('parejas')">👥 Parejas</div>
+                <div class="tab" onclick="showTab('jornadas')">📅 Jornadas</div>
+                <div class="tab" onclick="showTab('partidos')">🎾 Partidos</div>
+                <div class="tab" onclick="showTab('ranking')">🏅 Ranking</div>
+            </div>
+
+            <!-- Tab de Configuración -->
+            <div id="configuracion" class="tab-content active">
+                <div class="section">
+                    <h2>⚙️ Configuración del Torneo</h2>
+                    
+                    <div class="form-group">
+                        <label for="formatoTorneo">Formato del Torneo:</label>
+                        <select id="formatoTorneo" onchange="cambiarFormato()">
+                            <option value="todos">Todos contra todos (Liga)</option>
+                            <option value="grupos">Fase de grupos + Eliminatorias</option>
+                            <option value="eliminacion">Eliminación directa</option>
+                        </select>
+                    </div>
+
+                    <div id="configTodos" class="formato-config">
+                        <div class="info-box">
+                            <strong>Liga - Todos contra todos:</strong> Cada pareja juega contra todas las demás. 
+                            El ganador se determina por puntos totales.
+                        </div>
+                        <div class="form-group">
+                            <label for="puntosPorVictoria">Puntos por victoria:</label>
+                            <input type="number" id="puntosPorVictoria" value="3" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="puntosPorEmpate">Puntos por empate (si aplica):</label>
+                            <input type="number" id="puntosPorEmpate" value="1" min="0">
+                        </div>
+                    </div>
+
+                    <div id="configGrupos" class="formato-config" style="display: none;">
+                        <div class="info-box">
+                            <strong>Fase de grupos:</strong> Las parejas se dividen en grupos. Los mejores de cada grupo 
+                            avanzan a la fase eliminatoria.
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="numeroGrupos">Número de grupos:</label>
+                                <select id="numeroGrupos">
+                                    <option value="2">2 grupos</option>
+                                    <option value="4">4 grupos</option>
+                                    <option value="8">8 grupos</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="clasificanPorGrupo">Clasifican por grupo:</label>
+                                <select id="clasificanPorGrupo">
+                                    <option value="1">1 pareja</option>
+                                    <option value="2">2 parejas</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="configEliminacion" class="formato-config" style="display: none;">
+                        <div class="info-box">
+                            <strong>Eliminación directa:</strong> Formato de torneo con eliminación simple. 
+                            El perdedor de cada partido queda eliminado.
+                        </div>
+                        <div class="form-group">
+                            <label for="faseInicial">Fase inicial:</label>
+                            <select id="faseInicial">
+                                <option value="final">Final (2 parejas)</option>
+                                <option value="semifinal">Semifinales (4 parejas)</option>
+                                <option value="cuartos">Cuartos de final (8 parejas)</option>
+                                <option value="octavos">Octavos de final (16 parejas)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="tercerPuesto" checked>
+                            Partido por el tercer puesto
+                        </label>
+                    </div>
+
+                    <button onclick="guardarConfiguracion()" class="btn-success">
+                        💾 Guardar Configuración
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab de Parejas -->
+            <div id="parejas" class="tab-content">
+                <div class="section">
+                    <h2>👥 Registro de Parejas</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="jugador1">Jugador 1:</label>
+                            <input type="text" id="jugador1" placeholder="Nombre del jugador 1">
+                        </div>
+                        <div class="form-group">
+                            <label for="jugador2">Jugador 2:</label>
+                            <input type="text" id="jugador2" placeholder="Nombre del jugador 2">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nombrePareja">Nombre de la pareja (opcional):</label>
+                        <input type="text" id="nombrePareja" placeholder="Ej: Los Invencibles">
+                    </div>
+                    <button onclick="agregarPareja()">➕ Agregar Pareja</button>
+
+                    <h3 style="margin-top: 30px;">Parejas Registradas</h3>
+                    <div id="listaParejas" class="loading">Cargando parejas...</div>
+                </div>
+            </div>
+
+            <!-- Tab de Jornadas -->
+            <div id="jornadas" class="tab-content">
+                <div class="section">
+                    <h2>📅 Gestión de Jornadas</h2>
+                    
+                    <div class="form-group">
+                        <button onclick="generarJornadas()" class="btn-success">
+                            🎲 Generar Jornadas Automáticamente
+                        </button>
+                        <button onclick="mostrarFormularioJornada()" class="btn-secondary">
+                            ➕ Agregar Jornada Manual
+                        </button>
+                    </div>
+
+                    <!-- Formulario para agregar/editar jornada (oculto por defecto) -->
+                    <div id="formularioJornada" style="display: none; margin-top: 20px; padding: 20px; background: #f0f8ff; border-radius: 8px;">
+                        <h3 id="tituloFormularioJornada">Nueva Jornada</h3>
+                        <input type="hidden" id="jornadaEditId">
+                        
+                        <div class="form-group">
+                            <label for="nombreJornada">Nombre de la jornada:</label>
+                            <input type="text" id="nombreJornada" placeholder="Ej: Jornada 1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fechaJornada">Fecha de inicio (opcional):</label>
+                            <input type="date" id="fechaJornada">
+                        </div>
+                        
+                        <h4>Partidos de la jornada:</h4>
+                        <div id="partidosJornada">
+                            <!-- Aquí se agregarán dinámicamente los partidos -->
+                        </div>
+                        
+                        <button onclick="agregarPartidoJornada()" class="btn-secondary">
+                            ➕ Agregar Partido
+                        </button>
+                        
+                        <div style="margin-top: 20px;">
+                            <button onclick="guardarJornada()" class="btn-success">
+                                💾 Guardar Jornada
+                            </button>
+                            <button onclick="cancelarFormularioJornada()" class="btn-secondary">
+                                ❌ Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="listaJornadas" class="loading">Cargando jornadas...</div>
+                </div>
+            </div>
+
+            <!-- Tab de Partidos -->
+            <div id="partidos" class="tab-content">
+                <div class="section">
+                    <h2>🎾 Registro de Partidos</h2>
+                    
+                    <div class="form-group">
+                        <label for="jornadaPartido">Jornada:</label>
+                        <select id="jornadaPartido" onchange="cargarPartidosDeJornada()">
+                            <option value="">Selecciona una jornada</option>
+                        </select>
+                    </div>
+                    
+                    <div id="listaPartidosJornada" style="display: none;">
+                        <h3>Partidos de la jornada:</h3>
+                        <div id="partidosDisponibles"></div>
+                    </div>
+
+                    <h3 style="margin-top: 30px;">Historial de Partidos</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Jornada</th>
+                                <th>Fase</th>
+                                <th>Pareja 1</th>
+                                <th>Resultado</th>
+                                <th>Pareja 2</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaPartidos">
+                            <tr><td colspan="7" class="loading">Cargando partidos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab de Ranking -->
+            <div id="ranking" class="tab-content">
+                <div class="section">
+                    <h2>🏅 Ranking Individual</h2>
+                    <div id="rankingIndividual" class="loading">Calculando ranking...</div>
+                </div>
+
+                <div class="section">
+                    <h2>🎯 Ranking por Parejas</h2>
+                    <div id="rankingParejas" class="loading">Calculando ranking...</div>
+                </div>
+            </div>
         </div>
 
         <div class="footer">
-            <p>Premium PadelCup 2.0 © 2025 - Desarrollado por <a href="https://ecav.com.py" target="_blank" class="sponsor-link">ECAV.com.py</a></p>
+            <p>Premium PadelCup 2.0 © 2024 - Desarrollado por <a href="https://ecav.com.py" target="_blank" class="sponsor-link">ECAV.com.py</a></p>
         </div>
     </div>
 
@@ -1036,6 +747,9 @@ function deletePartido(spreadsheet, e) {
         let partidos = [];
         let callbackCounter = 0;
 
+        // URL HARDCODEADA - Cambia esta línea con tu URL real de Google Apps Script
+        const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5EYZ5LaJmI8OoavKsjOCI6V4a5j5r4sk6qkTW1nA32YPKpYYaoc0d-BzWccKj1YW4qg/exec';
+        
         // Función para hacer llamadas JSONP
         function jsonpRequest(url, params = {}) {
             return new Promise((resolve, reject) => {
@@ -1111,7 +825,6 @@ function deletePartido(spreadsheet, e) {
                 // Mostrar mensaje de carga
                 document.getElementById('setupSection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                document.getElementById('mainContent').innerHTML = '<p class="loading">Conectando con Google Sheets...</p>';
                 
                 // Cargar configuración
                 const configResult = await jsonpRequest(scriptUrl, { action: 'getConfig' });
@@ -1135,262 +848,6 @@ function deletePartido(spreadsheet, e) {
 
         // Cargar interfaz completa
         async function cargarInterfazCompleta() {
-            document.getElementById('mainContent').innerHTML = `
-                <div class="tabs">
-                    <div class="tab active" onclick="showTab('configuracion')">⚙️ Configuración</div>
-                    <div class="tab" onclick="showTab('parejas')">👥 Parejas</div>
-                    <div class="tab" onclick="showTab('jornadas')">📅 Jornadas</div>
-                    <div class="tab" onclick="showTab('partidos')">🎾 Partidos</div>
-                    <div class="tab" onclick="showTab('ranking')">🏅 Ranking</div>
-                </div>
-
-                <!-- Tab de Configuración -->
-                <div id="configuracion" class="tab-content active">
-                    <div class="section">
-                        <h2>⚙️ Configuración del Torneo</h2>
-                        
-                        <div class="form-group">
-                            <label for="formatoTorneo">Formato del Torneo:</label>
-                            <select id="formatoTorneo" onchange="cambiarFormato()">
-                                <option value="todos">Todos contra todos (Liga)</option>
-                                <option value="grupos">Fase de grupos + Eliminatorias</option>
-                                <option value="eliminacion">Eliminación directa</option>
-                            </select>
-                        </div>
-
-                        <div id="configTodos" class="formato-config">
-                            <div class="info-box">
-                                <strong>Liga - Todos contra todos:</strong> Cada pareja juega contra todas las demás. 
-                                El ganador se determina por puntos totales.
-                            </div>
-                            <div class="form-group">
-                                <label for="puntosPorVictoria">Puntos por victoria:</label>
-                                <input type="number" id="puntosPorVictoria" value="3" min="1">
-                            </div>
-                            <div class="form-group">
-                                <label for="puntosPorEmpate">Puntos por empate (si aplica):</label>
-                                <input type="number" id="puntosPorEmpate" value="1" min="0">
-                            </div>
-                        </div>
-
-                        <div id="configGrupos" class="formato-config" style="display: none;">
-                            <div class="info-box">
-                                <strong>Fase de grupos:</strong> Las parejas se dividen en grupos. Los mejores de cada grupo 
-                                avanzan a la fase eliminatoria.
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="numeroGrupos">Número de grupos:</label>
-                                    <select id="numeroGrupos">
-                                        <option value="2">2 grupos</option>
-                                        <option value="4">4 grupos</option>
-                                        <option value="8">8 grupos</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="clasificanPorGrupo">Clasifican por grupo:</label>
-                                    <select id="clasificanPorGrupo">
-                                        <option value="1">1 pareja</option>
-                                        <option value="2">2 parejas</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="configEliminacion" class="formato-config" style="display: none;">
-                            <div class="info-box">
-                                <strong>Eliminación directa:</strong> Formato de torneo con eliminación simple. 
-                                El perdedor de cada partido queda eliminado.
-                            </div>
-                            <div class="form-group">
-                                <label for="faseInicial">Fase inicial:</label>
-                                <select id="faseInicial">
-                                    <option value="final">Final (2 parejas)</option>
-                                    <option value="semifinal">Semifinales (4 parejas)</option>
-                                    <option value="cuartos">Cuartos de final (8 parejas)</option>
-                                    <option value="octavos">Octavos de final (16 parejas)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="tercerPuesto" checked>
-                                Partido por el tercer puesto
-                            </label>
-                        </div>
-
-                        <button onclick="guardarConfiguracion()" class="btn-success">
-                            💾 Guardar Configuración
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Tab de Parejas -->
-                <div id="parejas" class="tab-content">
-                    <div class="section">
-                        <h2>👥 Registro de Parejas</h2>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="jugador1">Jugador 1:</label>
-                                <input type="text" id="jugador1" placeholder="Nombre del jugador 1">
-                            </div>
-                            <div class="form-group">
-                                <label for="jugador2">Jugador 2:</label>
-                                <input type="text" id="jugador2" placeholder="Nombre del jugador 2">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="nombrePareja">Nombre de la pareja (opcional):</label>
-                            <input type="text" id="nombrePareja" placeholder="Ej: Los Invencibles">
-                        </div>
-                        <button onclick="agregarPareja()">➕ Agregar Pareja</button>
-
-                        <h3 style="margin-top: 30px;">Parejas Registradas</h3>
-                        <div id="listaParejas" class="loading">Cargando parejas...</div>
-                    </div>
-                </div>
-
-                <!-- Tab de Jornadas -->
-                <div id="jornadas" class="tab-content">
-                    <div class="section">
-                        <h2>📅 Gestión de Jornadas</h2>
-                        
-                        <div class="form-group">
-                            <button onclick="generarJornadas()" class="btn-success">
-                                🎲 Generar Jornadas Automáticamente
-                            </button>
-                            <button onclick="mostrarFormularioJornada()" class="btn-secondary">
-                                ➕ Agregar Jornada Manual
-                            </button>
-                        </div>
-
-                        <!-- Formulario para agregar/editar jornada (oculto por defecto) -->
-                        <div id="formularioJornada" style="display: none; margin-top: 20px; padding: 20px; background: #f0f8ff; border-radius: 8px;">
-                            <h3 id="tituloFormularioJornada">Nueva Jornada</h3>
-                            <input type="hidden" id="jornadaEditId">
-                            
-                            <div class="form-group">
-                                <label for="nombreJornada">Nombre de la jornada:</label>
-                                <input type="text" id="nombreJornada" placeholder="Ej: Jornada 1">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="fechaJornada">Fecha (opcional):</label>
-                                <input type="date" id="fechaJornada">
-                            </div>
-                            
-                            <h4>Partidos de la jornada:</h4>
-                            <div id="partidosJornada">
-                                <!-- Aquí se agregarán dinámicamente los partidos -->
-                            </div>
-                            
-                            <button onclick="agregarPartidoJornada()" class="btn-secondary">
-                                ➕ Agregar Partido
-                            </button>
-                            
-                            <div style="margin-top: 20px;">
-                                <button onclick="guardarJornada()" class="btn-success">
-                                    💾 Guardar Jornada
-                                </button>
-                                <button onclick="cancelarFormularioJornada()" class="btn-secondary">
-                                    ❌ Cancelar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div id="listaJornadas" class="loading">Cargando jornadas...</div>
-                    </div>
-                </div>
-
-                <!-- Tab de Partidos -->
-                <div id="partidos" class="tab-content">
-                    <div class="section">
-                        <h2>🎾 Registro de Partidos</h2>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="jornada">Jornada:</label>
-                                <select id="jornada">
-                                    <option value="">Selecciona una jornada</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="fase">Fase:</label>
-                                <select id="fase">
-                                    <option value="grupos">Fase de grupos</option>
-                                    <option value="octavos">Octavos de final</option>
-                                    <option value="cuartos">Cuartos de final</option>
-                                    <option value="semifinal">Semifinal</option>
-                                    <option value="final">Final</option>
-                                    <option value="tercero">Tercer puesto</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="pareja1">Pareja 1:</label>
-                                <select id="pareja1"></select>
-                            </div>
-                            <div class="form-group">
-                                <label for="pareja2">Pareja 2:</label>
-                                <select id="pareja2"></select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="fecha">Fecha y hora:</label>
-                                <input type="datetime-local" id="fecha">
-                            </div>
-                            <div class="form-group">
-                                <label for="pista">Pista:</label>
-                                <input type="text" id="pista" placeholder="Ej: Pista 1">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="resultado1">Resultado Pareja 1:</label>
-                                <input type="text" id="resultado1" placeholder="Ej: 6-4 7-5">
-                            </div>
-                            <div class="form-group">
-                                <label for="resultado2">Resultado Pareja 2:</label>
-                                <input type="text" id="resultado2" placeholder="Ej: 4-6 5-7">
-                            </div>
-                        </div>
-                        <button onclick="registrarPartido()">💾 Registrar Partido</button>
-
-                        <h3 style="margin-top: 30px;">Historial de Partidos</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Fase</th>
-                                    <th>Pareja 1</th>
-                                    <th>Resultado</th>
-                                    <th>Pareja 2</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="listaPartidos">
-                                <tr><td colspan="6" class="loading">Cargando partidos...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Tab de Ranking -->
-                <div id="ranking" class="tab-content">
-                    <div class="section">
-                        <h2>🏅 Ranking Individual</h2>
-                        <div id="rankingIndividual" class="loading">Calculando ranking...</div>
-                    </div>
-
-                    <div class="section">
-                        <h2>🎯 Ranking por Parejas</h2>
-                        <div id="rankingParejas" class="loading">Calculando ranking...</div>
-                    </div>
-                </div>
-            `;
-
             // Cargar configuración
             document.getElementById('formatoTorneo').value = configuracion.formato || 'todos';
             document.getElementById('puntosPorVictoria').value = configuracion.puntosPorVictoria || 3;
@@ -1406,9 +863,6 @@ function deletePartido(spreadsheet, e) {
             await cargarTodosLosDatos();
         }
 
-        // URL HARDCODEADA - Cambia esta línea con tu URL real de Google Apps Script
-        const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5EYZ5LaJmI8OoavKsjOCI6V4a5j5r4sk6qkTW1nA32YPKpYYaoc0d-BzWccKj1YW4qg/exec';
-        
         // Inicializar al cargar
         window.onload = function() {
             // Primero intenta cargar URL guardada, si no existe usa la hardcodeada
@@ -1645,26 +1099,6 @@ function deletePartido(spreadsheet, e) {
             }
         }
 
-        // Agregar jornada manual
-        async function agregarJornada() {
-            const nombre = prompt('Nombre de la jornada:');
-            if (!nombre) return;
-
-            try {
-                const result = await jsonpRequest(scriptUrl, { 
-                    action: 'addJornada', 
-                    nombre: nombre 
-                });
-                
-                if (result.success) {
-                    mostrarMensaje('✅ Jornada agregada correctamente', 'success');
-                    await cargarTodosLosDatos();
-                }
-            } catch (error) {
-                mostrarMensaje('Error al agregar jornada: ' + error.message, 'error');
-            }
-        }
-
         // Mostrar formulario de jornada
         function mostrarFormularioJornada() {
             document.getElementById('formularioJornada').style.display = 'block';
@@ -1844,7 +1278,7 @@ function deletePartido(spreadsheet, e) {
                 return;
             }
 
-            let html = '<table><thead><tr><th>Jornada</th><th>Fecha</th><th>Partidos</th><th>Acciones</th></tr></thead><tbody>';
+            let html = '<div style="overflow-x: auto;"><table><thead><tr><th>Jornada</th><th>Fecha Inicio</th><th>Partidos</th><th>Acciones</th></tr></thead><tbody>';
             
             jornadas.forEach(jornada => {
                 const numPartidos = jornada.partidos ? jornada.partidos.length : 0;
@@ -1862,6 +1296,9 @@ function deletePartido(spreadsheet, e) {
                 
                 // Mostrar partidos de la jornada con resultados
                 if (jornada.partidos && jornada.partidos.length > 0) {
+                    html += '<tr><td colspan="4"><table style="width: 100%; margin: 10px 0;">';
+                    html += '<thead><tr><th>Pareja 1</th><th>vs</th><th>Pareja 2</th><th>Resultado</th><th>Fecha Partido</th></tr></thead><tbody>';
+                    
                     jornada.partidos.forEach(partidoJornada => {
                         // Buscar si este partido tiene resultado registrado
                         const partidoConResultado = partidos.find(p => 
@@ -1873,36 +1310,48 @@ function deletePartido(spreadsheet, e) {
                         let resultadoHTML = '';
                         let estiloGanador1 = '';
                         let estiloGanador2 = '';
+                        let fechaPartido = '-';
                         
-                        if (partidoConResultado && partidoConResultado.resultado1 && partidoConResultado.resultado2) {
-                            resultadoHTML = ` (${partidoConResultado.resultado1} - ${partidoConResultado.resultado2})`;
-                            
-                            if (partidoConResultado.ganadorId === partidoJornada.pareja1.id) {
-                                estiloGanador1 = 'style="color: #28a745; font-weight: bold;"';
-                            } else if (partidoConResultado.ganadorId === partidoJornada.pareja2.id) {
-                                estiloGanador2 = 'style="color: #28a745; font-weight: bold;"';
+                        if (partidoConResultado) {
+                            if (partidoConResultado.resultado1 && partidoConResultado.resultado2) {
+                                resultadoHTML = `${partidoConResultado.resultado1} - ${partidoConResultado.resultado2}`;
+                                
+                                if (partidoConResultado.ganadorId === partidoJornada.pareja1.id) {
+                                    estiloGanador1 = 'style="color: #28a745; font-weight: bold;"';
+                                } else if (partidoConResultado.ganadorId === partidoJornada.pareja2.id) {
+                                    estiloGanador2 = 'style="color: #28a745; font-weight: bold;"';
+                                }
+                            } else {
+                                resultadoHTML = '<em>Pendiente</em>';
                             }
+                            
+                            if (partidoConResultado.fecha) {
+                                fechaPartido = new Date(partidoConResultado.fecha).toLocaleDateString('es-ES');
+                            }
+                        } else {
+                            resultadoHTML = '<em>Sin registrar</em>';
                         }
                         
-                        html += `<tr style="background-color: #f9f9f9;">
-                            <td colspan="4" style="padding-left: 30px;">
-                                <span ${estiloGanador1}>${partidoJornada.pareja1.nombre}</span>
-                                vs
-                                <span ${estiloGanador2}>${partidoJornada.pareja2.nombre}</span>
-                                ${resultadoHTML}
-                            </td>
+                        html += `<tr>
+                            <td ${estiloGanador1}>${partidoJornada.pareja1.nombre}</td>
+                            <td style="text-align: center;">vs</td>
+                            <td ${estiloGanador2}>${partidoJornada.pareja2.nombre}</td>
+                            <td style="text-align: center;">${resultadoHTML}</td>
+                            <td style="text-align: center;">${fechaPartido}</td>
                         </tr>`;
                     });
+                    
+                    html += '</tbody></table></td></tr>';
                 }
             });
             
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             lista.innerHTML = html;
         }
 
         // Actualizar select de jornadas
         function actualizarSelectJornadas() {
-            const select = document.getElementById('jornada');
+            const select = document.getElementById('jornadaPartido');
             if (select) {
                 select.innerHTML = '<option value="">Selecciona una jornada</option>';
                 jornadas.forEach(jornada => {
@@ -1929,39 +1378,135 @@ function deletePartido(spreadsheet, e) {
             }
         }
 
-        // Registrar partido
-        async function registrarPartido() {
-            const jornadaId = document.getElementById('jornada').value;
-            const fase = document.getElementById('fase').value;
-            const pareja1Id = document.getElementById('pareja1').value;
-            const pareja2Id = document.getElementById('pareja2').value;
-            const fecha = document.getElementById('fecha').value;
-            const pista = document.getElementById('pista').value;
-            const resultado1 = document.getElementById('resultado1').value.trim();
-            const resultado2 = document.getElementById('resultado2').value.trim();
-
-            if (!pareja1Id || !pareja2Id) {
-                alert('Por favor, selecciona ambas parejas');
+        // Cargar partidos de jornada seleccionada
+        function cargarPartidosDeJornada() {
+            const jornadaId = document.getElementById('jornadaPartido').value;
+            const contenedor = document.getElementById('partidosDisponibles');
+            
+            if (!jornadaId) {
+                document.getElementById('listaPartidosJornada').style.display = 'none';
                 return;
             }
-
-            if (pareja1Id === pareja2Id) {
-                alert('Las parejas deben ser diferentes');
+            
+            const jornada = jornadas.find(j => j.id === jornadaId);
+            if (!jornada || !jornada.partidos || jornada.partidos.length === 0) {
+                contenedor.innerHTML = '<p style="color: #666;">Esta jornada no tiene partidos definidos</p>';
+                document.getElementById('listaPartidosJornada').style.display = 'block';
                 return;
             }
+            
+            let html = '';
+            jornada.partidos.forEach((partidoJornada, index) => {
+                // Buscar si ya existe resultado
+                const partidoExistente = partidos.find(p => 
+                    p.jornadaId === jornadaId && 
+                    p.pareja1Id === partidoJornada.pareja1.id && 
+                    p.pareja2Id === partidoJornada.pareja2.id
+                );
+                
+                const yaRegistrado = partidoExistente && partidoExistente.resultado1 && partidoExistente.resultado2;
+                
+                html += `<div class="partido-card">
+                    <div class="partido-info">
+                        <strong>${partidoJornada.pareja1.nombre}</strong> vs <strong>${partidoJornada.pareja2.nombre}</strong>
+                        ${yaRegistrado ? `<span style="color: #28a745; margin-left: 10px;">✅ Registrado (${partidoExistente.resultado1} - ${partidoExistente.resultado2})</span>` : ''}
+                    </div>
+                    <button onclick="registrarResultadoPartido('${jornadaId}', '${partidoJornada.pareja1.id}', '${partidoJornada.pareja2.id}', '${partidoJornada.pareja1.nombre}', '${partidoJornada.pareja2.nombre}'${partidoExistente ? ", '" + partidoExistente.id + "'" : ''})" 
+                            class="${yaRegistrado ? 'btn-warning' : 'btn-success'}">
+                        ${yaRegistrado ? '✏️ Editar Resultado' : '📝 Registrar Resultado'}
+                    </button>
+                </div>`;
+            });
+            
+            contenedor.innerHTML = html;
+            document.getElementById('listaPartidosJornada').style.display = 'block';
+        }
 
+        // Registrar resultado de partido específico
+        async function registrarResultadoPartido(jornadaId, pareja1Id, pareja2Id, nombre1, nombre2, partidoId = null) {
+            // Crear un mini formulario para el resultado
+            const html = `
+                <div style="padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h3>Registrar Resultado</h3>
+                    <p><strong>${nombre1}</strong> vs <strong>${nombre2}</strong></p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Fecha del partido:</label>
+                            <input type="datetime-local" id="fechaPartidoModal" value="${new Date().toISOString().slice(0,16)}">
+                        </div>
+                        <div class="form-group">
+                            <label>Pista:</label>
+                            <input type="text" id="pistaPartidoModal" placeholder="Ej: Pista 1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Resultado ${nombre1}:</label>
+                            <input type="text" id="resultado1Modal" placeholder="Ej: 6-4 7-5">
+                        </div>
+                        <div class="form-group">
+                            <label>Resultado ${nombre2}:</label>
+                            <input type="text" id="resultado2Modal" placeholder="Ej: 4-6 5-7">
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button onclick="cerrarModalResultado()" class="btn-secondary">Cancelar</button>
+                        <button onclick="guardarResultadoPartido('${jornadaId}', '${pareja1Id}', '${pareja2Id}', ${partidoId ? "'" + partidoId + "'" : 'null'})" class="btn-success">Guardar</button>
+                    </div>
+                </div>
+            `;
+            
+            // Crear modal
+            const modal = document.createElement('div');
+            modal.id = 'modalResultado';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+            modal.innerHTML = html;
+            
+            document.body.appendChild(modal);
+            
+            // Si es edición, cargar datos existentes
+            if (partidoId) {
+                const partido = partidos.find(p => p.id === partidoId);
+                if (partido) {
+                    document.getElementById('fechaPartidoModal').value = partido.fecha || '';
+                    document.getElementById('pistaPartidoModal').value = partido.pista || '';
+                    document.getElementById('resultado1Modal').value = partido.resultado1 || '';
+                    document.getElementById('resultado2Modal').value = partido.resultado2 || '';
+                }
+            }
+        }
+
+        // Cerrar modal de resultado
+        function cerrarModalResultado() {
+            const modal = document.getElementById('modalResultado');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Guardar resultado de partido
+        async function guardarResultadoPartido(jornadaId, pareja1Id, pareja2Id, partidoId) {
+            const fecha = document.getElementById('fechaPartidoModal').value;
+            const pista = document.getElementById('pistaPartidoModal').value;
+            const resultado1 = document.getElementById('resultado1Modal').value.trim();
+            const resultado2 = document.getElementById('resultado2Modal').value.trim();
+            
+            if (!resultado1 || !resultado2) {
+                alert('Por favor, ingresa ambos resultados');
+                return;
+            }
+            
+            // Calcular ganador
             let ganadorId = '';
-            if (resultado1 && resultado2) {
-                const sets1 = contarSetsGanados(resultado1);
-                const sets2 = contarSetsGanados(resultado2);
-                ganadorId = sets1 > sets2 ? pareja1Id : pareja2Id;
-            }
-
+            const sets1 = contarSetsGanados(resultado1);
+            const sets2 = contarSetsGanados(resultado2);
+            ganadorId = sets1 > sets2 ? pareja1Id : pareja2Id;
+            
             try {
                 const params = {
-                    action: 'addPartido',
+                    action: partidoId ? 'updatePartido' : 'addPartido',
                     jornadaId: jornadaId,
-                    fase: fase,
+                    fase: 'grupos', // Ajustar según necesidad
                     fecha: fecha,
                     pista: pista,
                     pareja1Id: pareja1Id,
@@ -1970,20 +1515,21 @@ function deletePartido(spreadsheet, e) {
                     resultado2: resultado2,
                     ganadorId: ganadorId
                 };
+                
+                if (partidoId) {
+                    params.id = partidoId;
+                }
 
                 const result = await jsonpRequest(scriptUrl, params);
                 
                 if (result.success) {
-                    document.getElementById('fecha').value = '';
-                    document.getElementById('pista').value = '';
-                    document.getElementById('resultado1').value = '';
-                    document.getElementById('resultado2').value = '';
-                    
-                    mostrarMensaje('✅ Partido registrado correctamente', 'success');
+                    cerrarModalResultado();
+                    mostrarMensaje('✅ Resultado registrado correctamente', 'success');
                     await cargarTodosLosDatos();
+                    cargarPartidosDeJornada(); // Actualizar vista
                 }
             } catch (error) {
-                mostrarMensaje('Error al registrar partido: ' + error.message, 'error');
+                mostrarMensaje('Error al registrar resultado: ' + error.message, 'error');
             }
         }
 
@@ -2007,7 +1553,7 @@ function deletePartido(spreadsheet, e) {
             const tbody = document.getElementById('listaPartidos');
             
             if (partidos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">No hay partidos registrados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666;">No hay partidos registrados</td></tr>';
                 return;
             }
 
@@ -2024,6 +1570,7 @@ function deletePartido(spreadsheet, e) {
             partidosOrdenados.forEach(partido => {
                 const pareja1 = parejas.find(p => p.id === partido.pareja1Id);
                 const pareja2 = parejas.find(p => p.id === partido.pareja2Id);
+                const jornada = jornadas.find(j => j.id === partido.jornadaId);
                 
                 if (!pareja1 || !pareja2) return;
 
@@ -2032,6 +1579,7 @@ function deletePartido(spreadsheet, e) {
 
                 html += `<tr>
                     <td>${partido.fecha ? new Date(partido.fecha).toLocaleString('es-ES') : '-'}</td>
+                    <td>${jornada ? jornada.nombre : '-'}</td>
                     <td>${obtenerNombreFase(partido.fase)}</td>
                     <td class="${esGanador1 ? 'ganador' : ''}" style="${esGanador1 ? 'color: #28a745; font-weight: bold;' : ''}">
                         ${pareja1.nombre}
@@ -2049,7 +1597,7 @@ function deletePartido(spreadsheet, e) {
                 </tr>`;
             });
 
-            tbody.innerHTML = html || '<tr><td colspan="6" style="text-align: center; color: #666;">No hay partidos registrados</td></tr>';
+            tbody.innerHTML = html || '<tr><td colspan="7" style="text-align: center; color: #666;">No hay partidos registrados</td></tr>';
         }
 
         // Obtener nombre de fase
@@ -2075,43 +1623,14 @@ function deletePartido(spreadsheet, e) {
             
             if (!pareja1 || !pareja2) return;
             
-            const resultado1 = prompt(`Resultado de ${pareja1.nombre}:`, partido.resultado1 || '');
-            if (resultado1 === null) return;
-            
-            const resultado2 = prompt(`Resultado de ${pareja2.nombre}:`, partido.resultado2 || '');
-            if (resultado2 === null) return;
-            
-            let ganadorId = partido.ganadorId;
-            if (resultado1 && resultado2) {
-                const sets1 = contarSetsGanados(resultado1);
-                const sets2 = contarSetsGanados(resultado2);
-                ganadorId = sets1 > sets2 ? partido.pareja1Id : partido.pareja2Id;
-            }
-            
-            try {
-                const params = {
-                    action: 'updatePartido',
-                    id: id,
-                    jornadaId: partido.jornadaId || '',
-                    fase: partido.fase,
-                    fecha: partido.fecha || '',
-                    pista: partido.pista || '',
-                    pareja1Id: partido.pareja1Id,
-                    pareja2Id: partido.pareja2Id,
-                    resultado1: resultado1,
-                    resultado2: resultado2,
-                    ganadorId: ganadorId
-                };
-
-                const result = await jsonpRequest(scriptUrl, params);
-                
-                if (result.success) {
-                    mostrarMensaje('✅ Partido actualizado correctamente', 'success');
-                    await cargarTodosLosDatos();
-                }
-            } catch (error) {
-                mostrarMensaje('Error al actualizar partido: ' + error.message, 'error');
-            }
+            registrarResultadoPartido(
+                partido.jornadaId,
+                partido.pareja1Id,
+                partido.pareja2Id,
+                pareja1.nombre,
+                pareja2.nombre,
+                partido.id
+            );
         }
 
         // Eliminar partido
