@@ -1372,13 +1372,22 @@ function deletePartido(spreadsheet, e) {
             await cargarTodosLosDatos();
         }
 
+        // URL HARDCODEADA - Cambia esta línea con tu URL real de Google Apps Script
+        const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5EYZ5LaJmI8OoavKsjOCI6V4a5j5r4sk6qkTW1nA32YPKpYYaoc0d-BzWccKj1YW4qg/exec';
+        
         // Inicializar al cargar
         window.onload = function() {
-            // Intentar cargar URL guardada
+            // Primero intenta cargar URL guardada, si no existe usa la hardcodeada
             const savedUrl = localStorage.getItem('padelcup2_scriptUrl');
-            if (savedUrl) {
-                document.getElementById('scriptUrl').value = savedUrl;
-            }
+            const urlToUse = savedUrl || DEFAULT_SCRIPT_URL;
+            
+            document.getElementById('scriptUrl').value = urlToUse;
+            
+            // AUTOCONEXIÓN: Si quieres que se conecte automáticamente al cargar
+            // descomenta la siguiente línea después de poner tu URL real:
+            // if (urlToUse !== 'https://script.google.com/macros/s/TU_URL_AQUI/exec') { 
+            //     conectarGoogleSheets(); 
+            // }
         };
 
         // === FUNCIONES DE LA APLICACIÓN ===
