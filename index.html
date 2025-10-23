@@ -1860,12 +1860,36 @@ function deletePartido(spreadsheet, e) {
                     </td>
                 </tr>`;
                 
-                // Mostrar partidos de la jornada
+                // Mostrar partidos de la jornada con resultados
                 if (jornada.partidos && jornada.partidos.length > 0) {
-                    jornada.partidos.forEach(partido => {
+                    jornada.partidos.forEach(partidoJornada => {
+                        // Buscar si este partido tiene resultado registrado
+                        const partidoConResultado = partidos.find(p => 
+                            p.jornadaId === jornada.id && 
+                            p.pareja1Id === partidoJornada.pareja1.id && 
+                            p.pareja2Id === partidoJornada.pareja2.id
+                        );
+                        
+                        let resultadoHTML = '';
+                        let estiloGanador1 = '';
+                        let estiloGanador2 = '';
+                        
+                        if (partidoConResultado && partidoConResultado.resultado1 && partidoConResultado.resultado2) {
+                            resultadoHTML = ` (${partidoConResultado.resultado1} - ${partidoConResultado.resultado2})`;
+                            
+                            if (partidoConResultado.ganadorId === partidoJornada.pareja1.id) {
+                                estiloGanador1 = 'style="color: #28a745; font-weight: bold;"';
+                            } else if (partidoConResultado.ganadorId === partidoJornada.pareja2.id) {
+                                estiloGanador2 = 'style="color: #28a745; font-weight: bold;"';
+                            }
+                        }
+                        
                         html += `<tr style="background-color: #f9f9f9;">
                             <td colspan="4" style="padding-left: 30px;">
-                                ${partido.pareja1.nombre} vs ${partido.pareja2.nombre}
+                                <span ${estiloGanador1}>${partidoJornada.pareja1.nombre}</span>
+                                vs
+                                <span ${estiloGanador2}>${partidoJornada.pareja2.nombre}</span>
+                                ${resultadoHTML}
                             </td>
                         </tr>`;
                     });
@@ -1988,14 +2012,23 @@ function deletePartido(spreadsheet, e) {
             }
 
             let html = '';
-            partidos.forEach(partido => {
+            
+            // Ordenar partidos por fecha (más recientes primero)
+            const partidosOrdenados = [...partidos].sort((a, b) => {
+                if (a.fecha && b.fecha) {
+                    return new Date(b.fecha) - new Date(a.fecha);
+                }
+                return 0;
+            });
+            
+            partidosOrdenados.forEach(partido => {
                 const pareja1 = parejas.find(p => p.id === partido.pareja1Id);
                 const pareja2 = parejas.find(p => p.id === partido.pareja2Id);
                 
                 if (!pareja1 || !pareja2) return;
 
-                const esGanador1 = partido.ganadorId === pareja1.id;
-                const esGanador2 = partido.ganadorId === pareja2.id;
+                const esGanador1 = partido.ganadorId && partido.ganadorId === partido.pareja1Id;
+                const esGanador2 = partido.ganadorId && partido.ganadorId === partido.pareja2Id;
 
                 html += `<tr>
                     <td>${partido.fecha ? new Date(partido.fecha).toLocaleString('es-ES') : '-'}</td>
@@ -2003,17 +2036,20 @@ function deletePartido(spreadsheet, e) {
                     <td class="${esGanador1 ? 'ganador' : ''}" style="${esGanador1 ? 'color: #28a745; font-weight: bold;' : ''}">
                         ${pareja1.nombre}
                     </td>
-                    <td>${partido.resultado1 || '-'} | ${partido.resultado2 || '-'}</td>
+                    <td style="text-align: center;">
+                        ${partido.resultado1 || '-'} | ${partido.resultado2 || '-'}
+                    </td>
                     <td class="${esGanador2 ? 'ganador' : ''}" style="${esGanador2 ? 'color: #28a745; font-weight: bold;' : ''}">
                         ${pareja2.nombre}
                     </td>
                     <td>
+                        <button onclick="editarPartido('${partido.id}')" class="btn-warning">✏️</button>
                         <button onclick="eliminarPartido('${partido.id}')" class="btn-danger">🗑️</button>
                     </td>
                 </tr>`;
             });
 
-            tbody.innerHTML = html;
+            tbody.innerHTML = html || '<tr><td colspan="6" style="text-align: center; color: #666;">No hay partidos registrados</td></tr>';
         }
 
         // Obtener nombre de fase
@@ -2027,6 +2063,55 @@ function deletePartido(spreadsheet, e) {
                 'tercero': '3er Puesto'
             };
             return fases[fase] || fase;
+        }
+
+        // Editar partido
+        async function editarPartido(id) {
+            const partido = partidos.find(p => p.id === id);
+            if (!partido) return;
+            
+            const pareja1 = parejas.find(p => p.id === partido.pareja1Id);
+            const pareja2 = parejas.find(p => p.id === partido.pareja2Id);
+            
+            if (!pareja1 || !pareja2) return;
+            
+            const resultado1 = prompt(`Resultado de ${pareja1.nombre}:`, partido.resultado1 || '');
+            if (resultado1 === null) return;
+            
+            const resultado2 = prompt(`Resultado de ${pareja2.nombre}:`, partido.resultado2 || '');
+            if (resultado2 === null) return;
+            
+            let ganadorId = partido.ganadorId;
+            if (resultado1 && resultado2) {
+                const sets1 = contarSetsGanados(resultado1);
+                const sets2 = contarSetsGanados(resultado2);
+                ganadorId = sets1 > sets2 ? partido.pareja1Id : partido.pareja2Id;
+            }
+            
+            try {
+                const params = {
+                    action: 'updatePartido',
+                    id: id,
+                    jornadaId: partido.jornadaId || '',
+                    fase: partido.fase,
+                    fecha: partido.fecha || '',
+                    pista: partido.pista || '',
+                    pareja1Id: partido.pareja1Id,
+                    pareja2Id: partido.pareja2Id,
+                    resultado1: resultado1,
+                    resultado2: resultado2,
+                    ganadorId: ganadorId
+                };
+
+                const result = await jsonpRequest(scriptUrl, params);
+                
+                if (result.success) {
+                    mostrarMensaje('✅ Partido actualizado correctamente', 'success');
+                    await cargarTodosLosDatos();
+                }
+            } catch (error) {
+                mostrarMensaje('Error al actualizar partido: ' + error.message, 'error');
+            }
         }
 
         // Eliminar partido
@@ -2058,7 +2143,7 @@ function deletePartido(spreadsheet, e) {
             const jugadores = {};
 
             partidos.forEach(partido => {
-                if (!partido.resultado1 || !partido.resultado2) return;
+                if (!partido.resultado1 || !partido.resultado2 || !partido.ganadorId) return;
 
                 const pareja1 = parejas.find(p => p.id === partido.pareja1Id);
                 const pareja2 = parejas.find(p => p.id === partido.pareja2Id);
@@ -2067,18 +2152,28 @@ function deletePartido(spreadsheet, e) {
 
                 // Procesar jugadores de pareja 1
                 [pareja1.jugador1, pareja1.jugador2].forEach(jugador => {
+                    if (!jugador) return;
+                    
                     if (!jugadores[jugador]) {
                         jugadores[jugador] = { 
                             nombre: jugador, 
                             victorias: 0, 
                             derrotas: 0, 
-                            partidos: 0
+                            partidos: 0,
+                            setsGanados: 0,
+                            setsPerdidos: 0
                         };
                     }
                     
                     jugadores[jugador].partidos++;
                     
-                    if (partido.ganadorId === pareja1.id) {
+                    const sets1 = contarSetsGanados(partido.resultado1);
+                    const sets2 = contarSetsGanados(partido.resultado2);
+                    
+                    jugadores[jugador].setsGanados += sets1;
+                    jugadores[jugador].setsPerdidos += sets2;
+                    
+                    if (partido.ganadorId === partido.pareja1Id) {
                         jugadores[jugador].victorias++;
                     } else {
                         jugadores[jugador].derrotas++;
@@ -2087,18 +2182,28 @@ function deletePartido(spreadsheet, e) {
 
                 // Procesar jugadores de pareja 2
                 [pareja2.jugador1, pareja2.jugador2].forEach(jugador => {
+                    if (!jugador) return;
+                    
                     if (!jugadores[jugador]) {
                         jugadores[jugador] = { 
                             nombre: jugador, 
                             victorias: 0, 
                             derrotas: 0, 
-                            partidos: 0
+                            partidos: 0,
+                            setsGanados: 0,
+                            setsPerdidos: 0
                         };
                     }
                     
                     jugadores[jugador].partidos++;
                     
-                    if (partido.ganadorId === pareja2.id) {
+                    const sets1 = contarSetsGanados(partido.resultado1);
+                    const sets2 = contarSetsGanados(partido.resultado2);
+                    
+                    jugadores[jugador].setsGanados += sets2;
+                    jugadores[jugador].setsPerdidos += sets1;
+                    
+                    if (partido.ganadorId === partido.pareja2Id) {
                         jugadores[jugador].victorias++;
                     } else {
                         jugadores[jugador].derrotas++;
@@ -2108,7 +2213,13 @@ function deletePartido(spreadsheet, e) {
 
             const divRanking = document.getElementById('rankingIndividual');
             const rankingOrdenado = Object.values(jugadores)
-                .sort((a, b) => b.victorias - a.victorias || b.partidos - a.partidos);
+                .sort((a, b) => {
+                    // Ordenar por victorias, luego por diferencia de sets
+                    if (a.victorias !== b.victorias) return b.victorias - a.victorias;
+                    const difSetsA = a.setsGanados - a.setsPerdidos;
+                    const difSetsB = b.setsGanados - b.setsPerdidos;
+                    return difSetsB - difSetsA;
+                });
 
             if (rankingOrdenado.length === 0) {
                 divRanking.innerHTML = '<p style="text-align: center; color: #666;">No hay datos para mostrar el ranking</p>';
@@ -2121,13 +2232,14 @@ function deletePartido(spreadsheet, e) {
                     ? Math.round((jugador.victorias / jugador.partidos) * 100) 
                     : 0;
                 const positionClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+                const difSets = jugador.setsGanados - jugador.setsPerdidos;
                 
                 html += `<div class="ranking-card">
                     <div class="ranking-position ${positionClass}">#${index + 1}</div>
                     <div style="flex-grow: 1;">
                         <div style="font-size: 1.2em; font-weight: 500;">${jugador.nombre}</div>
                         <div style="color: #666; font-size: 0.9em;">
-                            ${jugador.victorias}V - ${jugador.derrotas}D (${porcentaje}%)
+                            ${jugador.victorias}V - ${jugador.derrotas}D (${porcentaje}%) | Sets: ${jugador.setsGanados}-${jugador.setsPerdidos} (${difSets > 0 ? '+' : ''}${difSets})
                         </div>
                     </div>
                 </div>`;
@@ -2141,7 +2253,7 @@ function deletePartido(spreadsheet, e) {
             const estadisticasParejas = {};
 
             partidos.forEach(partido => {
-                if (!partido.resultado1 || !partido.resultado2) return;
+                if (!partido.resultado1 || !partido.resultado2 || !partido.ganadorId) return;
 
                 const pareja1 = parejas.find(p => p.id === partido.pareja1Id);
                 const pareja2 = parejas.find(p => p.id === partido.pareja2Id);
@@ -2154,11 +2266,19 @@ function deletePartido(spreadsheet, e) {
                         pareja: pareja1,
                         victorias: 0,
                         derrotas: 0,
-                        puntos: 0
+                        puntos: 0,
+                        setsGanados: 0,
+                        setsPerdidos: 0
                     };
                 }
 
-                if (partido.ganadorId === pareja1.id) {
+                const sets1 = contarSetsGanados(partido.resultado1);
+                const sets2 = contarSetsGanados(partido.resultado2);
+                
+                estadisticasParejas[pareja1.id].setsGanados += sets1;
+                estadisticasParejas[pareja1.id].setsPerdidos += sets2;
+
+                if (partido.ganadorId === partido.pareja1Id) {
                     estadisticasParejas[pareja1.id].victorias++;
                     estadisticasParejas[pareja1.id].puntos += configuracion.puntosPorVictoria || 3;
                 } else {
@@ -2171,11 +2291,16 @@ function deletePartido(spreadsheet, e) {
                         pareja: pareja2,
                         victorias: 0,
                         derrotas: 0,
-                        puntos: 0
+                        puntos: 0,
+                        setsGanados: 0,
+                        setsPerdidos: 0
                     };
                 }
 
-                if (partido.ganadorId === pareja2.id) {
+                estadisticasParejas[pareja2.id].setsGanados += sets2;
+                estadisticasParejas[pareja2.id].setsPerdidos += sets1;
+
+                if (partido.ganadorId === partido.pareja2Id) {
                     estadisticasParejas[pareja2.id].victorias++;
                     estadisticasParejas[pareja2.id].puntos += configuracion.puntosPorVictoria || 3;
                 } else {
@@ -2190,19 +2315,29 @@ function deletePartido(spreadsheet, e) {
                 return;
             }
 
-            let html = '<table><thead><tr><th>Pos</th><th>Pareja</th><th>PJ</th><th>PG</th><th>PP</th><th>Puntos</th></tr></thead><tbody>';
-            
+            // Ordenar por puntos, luego por victorias, luego por diferencia de sets
             const rankingOrdenado = Object.values(estadisticasParejas)
-                .sort((a, b) => b.puntos - a.puntos || b.victorias - a.victorias);
+                .sort((a, b) => {
+                    if (a.puntos !== b.puntos) return b.puntos - a.puntos;
+                    if (a.victorias !== b.victorias) return b.victorias - a.victorias;
+                    const difSetsA = a.setsGanados - a.setsPerdidos;
+                    const difSetsB = b.setsGanados - b.setsPerdidos;
+                    return difSetsB - difSetsA;
+                });
 
+            let html = '<table><thead><tr><th>Pos</th><th>Pareja</th><th>PJ</th><th>PG</th><th>PP</th><th>Sets</th><th>Puntos</th></tr></thead><tbody>';
+            
             rankingOrdenado.forEach((stats, index) => {
                 const totalPartidos = stats.victorias + stats.derrotas;
-                html += `<tr>
+                const difSets = stats.setsGanados - stats.setsPerdidos;
+                
+                html += `<tr ${index < 2 ? 'style="background-color: #e8f5e9;"' : ''}>
                     <td><strong>${index + 1}</strong></td>
                     <td>${stats.pareja.nombre}</td>
                     <td>${totalPartidos}</td>
-                    <td>${stats.victorias}</td>
-                    <td>${stats.derrotas}</td>
+                    <td style="color: #28a745;">${stats.victorias}</td>
+                    <td style="color: #dc3545;">${stats.derrotas}</td>
+                    <td>${stats.setsGanados}-${stats.setsPerdidos} (${difSets > 0 ? '+' : ''}${difSets})</td>
                     <td><strong>${stats.puntos}</strong></td>
                 </tr>`;
             });
